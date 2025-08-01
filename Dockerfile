@@ -1,19 +1,17 @@
-# syntax=docker/dockerfile:1.9
 FROM python:3.12-slim as builder
 
 WORKDIR /app
-
 # Install system dependencies for building
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv using the installer script
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
-ENV PATH="/root/.local/bin:$PATH"
+RUN pip install uv -i https://mirrors.aliyun.com/pypi/simple/
+
 
 # Configure uv for optimal Docker usage
 ENV UV_COMPILE_BYTECODE=1 \
@@ -30,25 +28,28 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Install the built wheel to make it available for server
 RUN --mount=type=cache,target=/root/.cache/uv \
-    pip install dist/*.whl
+    pip install dist/*.whl  -i https://mirrors.aliyun.com/pypi/simple/
+
 
 # Runtime stage - build the server here
 FROM python:3.12-slim
 
+
+RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
 # Install uv using the installer script
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
-ENV PATH="/root/.local/bin:$PATH"
+    RUN pip install uv -i https://mirrors.aliyun.com/pypi/simple/
+
 
 # Configure uv for runtime
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
+    
 
 # Create non-root user
 RUN groupadd -r app && useradd -r -d /app -g app app
@@ -58,7 +59,8 @@ COPY --from=builder /app/dist/*.whl /tmp/
 
 # Install graphiti-core wheel first
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system /tmp/*.whl
+    uv pip install --system /tmp/*.whl  -i https://mirrors.aliyun.com/pypi/simple/
+
 
 # Set up the server application
 WORKDIR /app

@@ -22,6 +22,9 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+
+from graphiti_core.embedder import OpenAIEmbedderConfig, OpenAIEmbedder
+from graphiti_core.llm_client import LLMConfig, QwenClient
 from transcript_parser import parse_podcast_messages
 
 from graphiti_core import Graphiti
@@ -71,7 +74,18 @@ class IsPresidentOf(BaseModel):
 
 async def main(use_bulk: bool = False):
     setup_logging()
-    client = Graphiti(neo4j_uri, neo4j_user, neo4j_password)
+
+
+    config = LLMConfig(api_key='sk-f44aac2987b54026a5af2d5d54dd08cc', model='qwen-plus',base_url='https://dashscope.aliyuncs.com/compatible-mode/v1')
+    qwen_client = QwenClient(config=config)
+
+    embedding = OpenAIEmbedderConfig(api_key='sk-f44aac2987b54026a5af2d5d54dd08cc', embedding_model='text-embedding-v3',base_url='https://dashscope.aliyuncs.com/compatible-mode/v1')
+    embedding_client = OpenAIEmbedder(embedding)
+    # Initialize Graphiti with Neo4j connection
+    client = Graphiti(neo4j_uri, neo4j_user, neo4j_password,llm_client=qwen_client,embedder=embedding_client)
+
+
+    # client = Graphiti(neo4j_uri, neo4j_user, neo4j_password)
     await clear_data(client.driver)
     await client.build_indices_and_constraints()
     messages = parse_podcast_messages()

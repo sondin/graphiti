@@ -22,8 +22,12 @@ from datetime import datetime, timezone
 from logging import INFO
 
 from dotenv import load_dotenv
+from openai import embeddings
 
 from graphiti_core import Graphiti
+from graphiti_core.embedder import OpenAIEmbedder, OpenAIEmbedderConfig
+from graphiti_core.embedder.client import EmbedderConfig
+from graphiti_core.llm_client import LLMConfig, QwenClient
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_RRF
 
@@ -60,11 +64,16 @@ async def main():
     #################################################
     # Connect to Neo4j and set up Graphiti indices
     # This is required before using other Graphiti
-    # functionality
+    # functionalityOPENAI_API_KEY=
+    # OPENAI_BASE_URL=
     #################################################
+    config = LLMConfig(api_key='sk-f44aac2987b54026a5af2d5d54dd08cc', model='qwen-plus',base_url='https://dashscope.aliyuncs.com/compatible-mode/v1')
+    qwen_client = QwenClient(config=config)
 
+    embedding = OpenAIEmbedderConfig(api_key='sk-f44aac2987b54026a5af2d5d54dd08cc', embedding_model='text-embedding-v3',base_url='https://dashscope.aliyuncs.com/compatible-mode/v1')
+    embedding_client = OpenAIEmbedder(embedding)
     # Initialize Graphiti with Neo4j connection
-    graphiti = Graphiti(neo4j_uri, neo4j_user, neo4j_password)
+    graphiti = Graphiti(neo4j_uri, neo4j_user, neo4j_password,llm_client=qwen_client,embedder=embedding_client)
 
     try:
         # Initialize the graph database with graphiti's indices. This only needs to be done once.
@@ -117,17 +126,17 @@ async def main():
         ]
 
         # Add episodes to the graph
-        for i, episode in enumerate(episodes):
-            await graphiti.add_episode(
-                name=f'Freakonomics Radio {i}',
-                episode_body=episode['content']
-                if isinstance(episode['content'], str)
-                else json.dumps(episode['content']),
-                source=episode['type'],
-                source_description=episode['description'],
-                reference_time=datetime.now(timezone.utc),
-            )
-            print(f'Added episode: Freakonomics Radio {i} ({episode["type"].value})')
+        # for i, episode in enumerate(episodes):
+        #     await graphiti.add_episode(
+        #         name=f'Freakonomics Radio {i}',
+        #         episode_body=episode['content']
+        #         if isinstance(episode['content'], str)
+        #         else json.dumps(episode['content']),
+        #         source=episode['type'],
+        #         source_description=episode['description'],
+        #         reference_time=datetime.now(timezone.utc),
+        #     )
+        #     print(f'Added episode: Freakonomics Radio {i} ({episode["type"].value})')
 
         #################################################
         # BASIC SEARCH
@@ -138,7 +147,7 @@ async def main():
         # similarity and BM25 text retrieval.
         #################################################
 
-        # Perform a hybrid search combining semantic similarity and BM25 retrieval
+        # # Perform a hybrid search combining semantic similarity and BM25 retrieval
         print("\nSearching for: 'Who was the California Attorney General?'")
         results = await graphiti.search('Who was the California Attorney General?')
 
@@ -152,16 +161,16 @@ async def main():
             if hasattr(result, 'invalid_at') and result.invalid_at:
                 print(f'Valid until: {result.invalid_at}')
             print('---')
-
-        #################################################
-        # CENTER NODE SEARCH
-        #################################################
-        # For more contextually relevant results, you can
-        # use a center node to rerank search results based
-        # on their graph distance to a specific node
-        #################################################
-
-        # Use the top search result's UUID as the center node for reranking
+        #
+        # #################################################
+        # # CENTER NODE SEARCH
+        # #################################################
+        # # For more contextually relevant results, you can
+        # # use a center node to rerank search results based
+        # # on their graph distance to a specific node
+        # #################################################
+        #
+        # # Use the top search result's UUID as the center node for reranking
         if results and len(results) > 0:
             # Get the source node UUID from the top result
             center_node_uuid = results[0].source_node_uuid
